@@ -171,16 +171,16 @@ export function plannerErrorMessage(error) {
   const message = String(error?.message ?? error ?? '')
 
   if (code === 'PGRST205' || code === '42P01' || /schema cache/i.test(message)) {
-    return 'The planner tables are missing. Open the Supabase SQL Editor and run supabase/schema.sql, then supabase/seed.sql.'
+    return 'The schedule database is not initialized yet. Please contact your PM.'
   }
 
   if (code === '42501' || /permission denied/i.test(message)) {
-    return 'The planner tables exist but the anon role cannot read them. Re-run the GRANT and RLS section of supabase/schema.sql.'
+    return 'Database permissions need updating. Please contact your PM.'
   }
 
   if (/failed to fetch|network|fetch failed/i.test(message)) {
-    return 'Could not reach Supabase. Check your internet connection and the VITE_SUPABASE_URL value in .env.'
+    return 'Could not reach the server. Check your internet connection and try again.'
   }
 
-  return message || 'Could not load the planner from Supabase.'
+  return message || 'Could not load the schedule. Please try again.'
 }

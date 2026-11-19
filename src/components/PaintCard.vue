@@ -1,10 +1,20 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Info, MousePointerClick, RefreshCw, Star, Trash2, User, UserCheck } from '@lucide/vue'
+import {
+  CalendarX,
+  Info,
+  MousePointerClick,
+  RefreshCw,
+  Star,
+  Trash2,
+  User,
+  UserCheck,
+} from '@lucide/vue'
 import { fmt, slotLabel } from '../lib/dates'
 import { ROSTER } from '../data/roster'
 import { toast } from '../composables/useToast'
 import Hamster from './Hamster.vue'
+import RosterCombobox from './RosterCombobox.vue'
 
 const props = defineProps({
   days: { type: Set, required: true },
@@ -18,6 +28,7 @@ const props = defineProps({
   responded: { type: Number, default: 0 },
   bestSlot: { type: Object, default: null },
   selectedSlot: { type: String, default: '' },
+  unavailable: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -27,6 +38,7 @@ const emit = defineEmits([
   'select',
   'clear-selection',
   'clear',
+  'mark-unavailable',
   'paint-start',
   'paint-end',
 ])
@@ -38,11 +50,44 @@ const slots = computed(() => {
   for (let h = props.startHour; h < props.endHour; h += 0.5) out.push(h)
   return out
 })
+const activeDay = ref('all')
+
+const visibleDays = computed(() => {
+  if (activeDay.value !== 'all' && dayList.value.includes(activeDay.value)) {
+    return [activeDay.value]
+  }
+  return dayList.value
+})
+
+watch(dayList, (list) => {
+  if (activeDay.value !== 'all' && !list.includes(activeDay.value)) {
+    activeDay.value = 'all'
+  }
+})
+
+watch(
+  () => props.selectedSlot,
+  (val) => {
+    if (val && activeDay.value !== 'all') {
+      const [day] = val.split('|')
+      if (day !== activeDay.value) activeDay.value = 'all'
+    }
+  },
+)
+
 const columns = computed(
-  () => `var(--timecol) repeat(${dayList.value.length}, minmax(var(--cellw), 1fr))`,
+  () => `var(--timecol) repeat(${visibleDays.value.length}, minmax(var(--cellw), 1fr))`,
 )
 const isGroup = computed(() => props.tool === 'group')
-const mine = computed(() => (me.value ? (props.replies[me.value] ?? new Set()) : new Set()))
+const mine = computed(() => {
+  if (!me.value) return new Set()
+  const raw = props.replies[me.value] ?? new Set()
+  const filtered = new Set()
+  for (const k of raw) {
+    if (!k.endsWith('|-1')) filtered.add(k)
+  }
+  return filtered
+})
 const bestKey = computed(() =>
   props.bestSlot ? `${props.bestSlot.day}|${props.bestSlot.slot}` : '',
 )
@@ -95,7 +140,7 @@ function rowLabel(slot) {
 }
 
 function askClear() {
-  if (!mine.value.size) return
+  if (!mine.value.size && !props.unavailable) return
   confirmingClear.value = true
 }
 
@@ -346,23 +391,19 @@ onUnmounted(() => {
     <div v-if="!isGroup" class="mhead">
       <div class="pickwrap">
         <label for="me">I’m</label>
-        <select
-          id="me"
+        <RosterCombobox
           ref="picker"
           v-model="me"
-          :class="{ shake }"
+          :shake="shake"
           :disabled="loading"
-        >
-          <option value="">— pick your name —</option>
-          <option v-for="p in ROSTER" :key="p">{{ p }}</option>
-        </select>
+        />
       </div>
       <span :class="['whochip', me ? '' : 'none']">
         <UserCheck v-if="me" />
         <User v-else />
         {{
           me
-            ? `Painting as ${me} · ${mine.size} block${mine.size === 1 ? '' : 's'}`
+            ? `Painting as ${me} · ${mine.size} time slot${mine.size === 1 ? '' : 's'}`
             : 'No name picked yet'
         }}
       </span>
@@ -371,19 +412,32 @@ onUnmounted(() => {
           v-if="!confirmingClear"
           class="pill"
           type="button"
-          :disabled="!mine.size"
-          title="Remove every time you painted for this event"
+          :disabled="!mine.size && !unavailable"
+          title="Remove your response for this event"
           @click="askClear"
         >
           <Trash2 />Clear my times
         </button>
         <template v-else>
           <span class="clearask" role="alert">
-            Clear all {{ mine.size }} {{ mine.size === 1 ? 'time' : 'times' }}?
+            Clear {{ unavailable ? 'unavailable response' : `all ${mine.size} ${mine.size === 1 ? 'time' : 'times'}` }}?
           </span>
           <button class="pill danger" type="button" @click="doClear">Yes, clear</button>
           <button class="pill" type="button" @click="confirmingClear = false">Cancel</button>
         </template>
+
+        <span v-if="unavailable" class="whochip warn" title="You marked that you can’t make any candidate slots">
+          <CalendarX />Can’t make any slots
+        </span>
+        <button
+          v-else-if="!mine.size"
+          class="pill subtle"
+          type="button"
+          title="Mark that you cannot attend any of these times"
+          @click="$emit('mark-unavailable')"
+        >
+          <CalendarX />Can’t make any slots
+        </button>
       </div>
     </div>
     <p class="hint">
@@ -416,21 +470,34 @@ onUnmounted(() => {
         <Hamster :kind="5" :height="30" raw />
       </span>
     </div>
-    <div v-if="isGroup && selected" class="slotinfo">
+    <div v-if="isGroup && selected" class="slotinfo" role="region" aria-live="polite">
       <div class="slothead">
-        <b>{{ selectedLabel }}</b>
-        <span>
-          {{ selectedFree.length }} free · {{ selectedBusy.length }} busy ·
-          {{ selectedWaiting }} not replied
-        </span>
+        <div class="slothead-title">
+          <b>{{ selectedLabel }}</b>
+          <div class="slothead-stats">
+            <span class="stat-free">{{ selectedFree.length }} free</span>
+            <span class="dot">·</span>
+            <span class="stat-busy">{{ selectedBusy.length }} busy</span>
+            <span class="dot">·</span>
+            <span class="stat-waiting">{{ selectedWaiting }} not replied</span>
+          </div>
+        </div>
         <button class="pill" type="button" @click="$emit('clear-selection')">Close</button>
       </div>
-      <p class="slotnames">
-        <b>Free:</b> {{ selectedFree.length ? selectedFree.join(', ') : 'nobody yet' }}
-      </p>
-      <p v-if="selectedBusy.length" class="slotnames">
-        <b>Busy:</b> {{ selectedBusy.join(', ') }}
-      </p>
+      <div class="slot-groups">
+        <div v-if="selectedFree.length" class="slot-group">
+          <span class="group-label">Free:</span>
+          <div class="name-chips">
+            <span v-for="n in selectedFree" :key="n" class="chip free">{{ n }}</span>
+          </div>
+        </div>
+        <div v-if="selectedBusy.length" class="slot-group">
+          <span class="group-label">Busy:</span>
+          <div class="name-chips">
+            <span v-for="n in selectedBusy" :key="n" class="chip busy">{{ n }}</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div v-if="error" class="guide warn">
       <Info />
@@ -439,15 +506,42 @@ onUnmounted(() => {
         <RefreshCw />
       </button>
     </div>
-    <p v-if="dayList.length > 1" class="scrollcue">
+
+    <!-- Day Selector Tabs for mobile / focused viewing -->
+    <div v-if="dayList.length > 1" class="day-tabs" role="tablist" aria-label="Filter candidate days">
+      <button
+        type="button"
+        class="day-tab"
+        :class="{ active: activeDay === 'all' }"
+        role="tab"
+        :aria-selected="activeDay === 'all'"
+        @click="activeDay = 'all'"
+      >
+        All days ({{ dayList.length }})
+      </button>
+      <button
+        v-for="d in dayList"
+        :key="d"
+        type="button"
+        class="day-tab"
+        :class="{ active: activeDay === d }"
+        role="tab"
+        :aria-selected="activeDay === d"
+        @click="activeDay = d"
+      >
+        {{ fmt(d).dow }} {{ fmt(d).md }}
+      </button>
+    </div>
+
+    <p v-if="dayList.length > 1 && activeDay === 'all'" class="scrollcue">
       Swipe sideways for all {{ dayList.length }} days →
     </p>
     <div class="scrollwrap">
       <div class="scroll">
         <div v-if="!dayList.length" class="empty">
           <p>
-            No candidate days yet — the PM hasn’t picked days for this event in Supabase.<br />The
-            grid wakes up as soon as days are added.
+            No candidate days yet — the PM hasn’t picked days for this event yet.<br />The
+            grid will appear as soon as days are added.
           </p>
         </div>
         <div
@@ -460,13 +554,13 @@ onUnmounted(() => {
           @keydown="onGridKey"
         >
           <div class="corner" />
-          <div v-for="d in dayList" :key="`h-${d}`" class="th">
+          <div v-for="d in visibleDays" :key="`h-${d}`" class="th">
             <b>{{ fmt(d).dow }}</b><small>{{ fmt(d).md }}</small>
           </div>
           <template v-for="s in slots" :key="s">
             <div class="tlab" :class="{ half: s % 1 !== 0 }">{{ rowLabel(s) }}</div>
             <div
-              v-for="d in dayList"
+              v-for="d in visibleDays"
               :key="`${d}-${s}`"
               class="cell"
               :class="{

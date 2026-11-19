@@ -41,14 +41,36 @@ const title = computed(() => `${MNAMES[view.value.m]} ${view.value.y}`)
 
 const cells = computed(() => {
   const { y, m } = view.value
-  const first = new Date(y, m, 1).getDay()
-  const count = new Date(y, m + 1, 0).getDate()
+  const firstDay = new Date(y, m, 1).getDay()
+  const currentCount = new Date(y, m + 1, 0).getDate()
   const out = []
-  for (let i = 0; i < first; i++) out.push({ blank: true, key: `blank-${i}` })
-  for (let d = 1; d <= count; d++) {
+
+  // Trailing days from previous month
+  if (firstDay > 0) {
+    const prevDate = new Date(y, m, 0)
+    const prevCount = prevDate.getDate()
+    const prevY = prevDate.getFullYear()
+    const prevM = prevDate.getMonth()
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const d = prevCount - i
+      const key = iso(prevY, prevM, d)
+      out.push({
+        outside: true,
+        key,
+        day: d,
+        on: props.days.has(key),
+        past: key < TODAY,
+        today: key === TODAY,
+        ms: milestones.value[key],
+      })
+    }
+  }
+
+  // Days in current month
+  for (let d = 1; d <= currentCount; d++) {
     const key = iso(y, m, d)
     out.push({
-      blank: false,
+      outside: false,
       key,
       day: d,
       on: props.days.has(key),
@@ -57,6 +79,28 @@ const cells = computed(() => {
       ms: milestones.value[key],
     })
   }
+
+  // Leading days from next month to complete the week through Saturday
+  const lastWeekday = new Date(y, m, currentCount).getDay()
+  if (lastWeekday < 6) {
+    const nextDate = new Date(y, m + 1, 1)
+    const nextY = nextDate.getFullYear()
+    const nextM = nextDate.getMonth()
+    const daysToAdd = 6 - lastWeekday
+    for (let d = 1; d <= daysToAdd; d++) {
+      const key = iso(nextY, nextM, d)
+      out.push({
+        outside: true,
+        key,
+        day: d,
+        on: props.days.has(key),
+        past: key < TODAY,
+        today: key === TODAY,
+        ms: milestones.value[key],
+      })
+    }
+  }
+
   return out
 })
 
@@ -97,16 +141,13 @@ function move(step) {
         v-for="c in cells"
         :key="c.key"
         class="day"
-        :class="{ on: c.on, past: c.past, today: c.today, ms: c.ms, blank: c.blank }"
-        :title="c.blank ? undefined : c.ms || (c.on ? 'Candidate day' : '')"
+        :class="{ on: c.on, past: c.past, today: c.today, ms: c.ms, outside: c.outside }"
+        :title="c.ms || (c.on ? 'Candidate day' : '')"
         :aria-label="
-          c.blank
-            ? undefined
-            : `${c.key}${c.on ? ', candidate day' : ''}${c.ms ? `, deadline: ${c.ms}` : ''}`
+          `${c.key}${c.outside ? ', outside month' : ''}${c.on ? ', candidate day' : ''}${c.ms ? `, deadline: ${c.ms}` : ''}`
         "
-        :aria-hidden="c.blank || undefined"
       >
-        {{ c.blank ? '' : c.day }}
+        {{ c.day }}
       </span>
     </div>
     <p class="calcount">
@@ -119,7 +160,7 @@ function move(step) {
     <div class="guide">
       <CalendarDays />
       <span>
-        <b>These are the candidate days</b> picked by the PM in Supabase — each one becomes a column
+        <b>These are the candidate days</b> picked by the PM — each one becomes a column
         in the grid. Use <b>‹ ›</b> to move between months. <b style="color: var(--green-ink)">Green</b>
         = candidate day · <b style="color: var(--danger-ink)">●</b> = a timeline deadline ·
         <b style="color: var(--teal-deep)">ring</b> = today · past days are locked.
@@ -129,6 +170,6 @@ function move(step) {
       <b>Grid hours</b> {{ slotLabel(startHour) }} – {{ slotLabel(endHour) }}
       <span>· half-hour rows</span>
     </p>
-    <p class="cap">Days and hours are managed by the PM in Supabase.</p>
+    <p class="cap">Days and hours are managed by the PM.</p>
   </section>
 </template>

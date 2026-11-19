@@ -54,7 +54,29 @@ const activeEvent = computed(
 const days = computed(() => activeEvent.value?.days ?? new Set())
 const startHour = computed(() => activeEvent.value?.startHour ?? 8)
 const endHour = computed(() => activeEvent.value?.endHour ?? 18)
-const myBlocks = computed(() => (me.value ? (replies.value[me.value]?.size ?? 0) : 0))
+
+const isClassmateUnavailable = (name) => {
+  const set = replies.value[name]
+  if (!set || !set.size) return false
+  for (const k of set) {
+    if (k.endsWith('|-1')) return true
+  }
+  return false
+}
+
+const myUnavailable = computed(() => (me.value ? isClassmateUnavailable(me.value) : false))
+
+const myBlocks = computed(() => {
+  if (!me.value) return 0
+  const set = replies.value[me.value]
+  if (!set) return 0
+  let count = 0
+  for (const k of set) {
+    if (!k.endsWith('|-1')) count++
+  }
+  return count
+})
+
 const repliedCount = computed(
   () => Object.values(replies.value).filter((blocks) => blocks.size > 0).length,
 )
@@ -136,7 +158,7 @@ async function load() {
 
   if (!isSupabaseConfigured) {
     loadError.value =
-      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env, then restart the dev server.'
+      'Schedule database connection is not configured yet. If you are the PM, check your environment settings.'
     loading.value = false
     return
   }
@@ -157,7 +179,7 @@ async function load() {
 
     if (!events.value.length) {
       loadError.value =
-        'Connected to Supabase, but there are no events yet. Run supabase/seed.sql to add the HKK event.'
+        'No events found yet. The PM needs to add an event first.'
     } else if (activeEventId.value === previousId) {
       // Same event after a refresh: reload its replies without blanking the grid.
       reloadTick.value += 1
@@ -249,9 +271,79 @@ function toggleBlock({ day, slot, on }) {
   if (current.has(key) === on) return
 
   const next = new Set(current)
-  if (on) next.add(key)
-  else next.delete(key)
+  if (on) {
+    next.add(key)
+    // Clear any unavailable sentinel when painting a real slot
+    for (const k of next) {
+      if (k.endsWith('|-1')) next.delete(k)
+    }
+  } else {
+    next.delete(key)
+  }
   replies.value = { ...replies.value, [name]: next }
+}
+
+async function markUnavailable() {
+  const eventId = activeEvent.value?.id
+  const name = me.value
+  if (!name) {
+    toast('Pick your name first', { kind: 8 })
+    return
+  }
+  if (!eventId) return
+  if (saving.value) {
+    toast('Hold on — still saving', { kind: 8 })
+    return
+  }
+
+  const before = new Set(replies.value[name] ?? [])
+  const firstDay = [...days.value].sort()[0]
+  if (!firstDay) {
+    toast('No candidate days in this event yet', { kind: 8 })
+    return
+  }
+
+  const unavailableKey = `${firstDay}|-1`
+  replies.value = { ...replies.value, [name]: new Set([unavailableKey]) }
+  saving.value = true
+  try {
+    if (before.size) await clearBlocks(eventId, name)
+    await addBlocks(eventId, name, [unavailableKey])
+    if (me.value === name && activeEvent.value?.id === eventId) {
+      savedMine.value = new Set([unavailableKey])
+    }
+
+    toast('Marked as unavailable for all slots', {
+      kind: 6,
+      action: {
+        label: 'Undo',
+        fn: async () => {
+          if (!me.value || activeEvent.value?.id !== eventId) return
+          saving.value = true
+          try {
+            await clearBlocks(eventId, name)
+            if (before.size) {
+              await addBlocks(eventId, name, [...before])
+            }
+            replies.value = { ...replies.value, [name]: new Set(before) }
+            savedMine.value = new Set(before)
+            toast('Restored your previous times', { kind: 9 })
+          } catch {
+            toast('Could not restore previous reply', { kind: 8 })
+          } finally {
+            saving.value = false
+          }
+        },
+      },
+    })
+  } catch (error) {
+    if (activeEvent.value?.id === eventId) {
+      replies.value = { ...replies.value, [name]: before }
+    }
+    toast(plannerErrorMessage(error), { kind: 8 })
+  } finally {
+    saving.value = false
+  }
 }
 
 async function commit() {
@@ -315,7 +407,7 @@ async function clearMine() {
 
   const before = new Set(replies.value[name] ?? [])
   if (!before.size) {
-    toast('Nothing painted yet', { kind: 3 })
+    toast('Nothing to clear', { kind: 3 })
     return
   }
 
@@ -324,7 +416,27 @@ async function clearMine() {
   try {
     await clearBlocks(eventId, name)
     if (me.value === name && activeEvent.value?.id === eventId) savedMine.value = new Set()
-    toast('Your times were cleared', { kind: 6 })
+
+    toast('Your response was cleared', {
+      kind: 6,
+      action: {
+        label: 'Undo',
+        fn: async () => {
+          if (!me.value || activeEvent.value?.id !== eventId) return
+          saving.value = true
+          try {
+            replies.value = { ...replies.value, [name]: new Set(before) }
+            await addBlocks(eventId, name, [...before])
+            savedMine.value = new Set(before)
+            toast('Restored your times', { kind: 9 })
+          } catch (error) {
+            toast('Could not restore response — try painting again', { kind: 8 })
+          } finally {
+            saving.value = false
+          }
+        },
+      },
+    })
   } catch (error) {
     if (activeEvent.value?.id === eventId) {
       replies.value = { ...replies.value, [name]: before }
@@ -507,12 +619,14 @@ onUnmounted(() => {
           :responded="repliedCount"
           :best-slot="bestSlot"
           :selected-slot="selectedSlot"
+          :unavailable="myUnavailable"
           @toggle="toggleBlock"
           @commit="commit"
           @retry="loadReplies"
           @select="selectSlot"
           @clear="clearMine"
           @clear-selection="clearSelection"
+          @mark-unavailable="markUnavailable"
           @paint-start="onPaintStart"
           @paint-end="onPaintEnd"
         />

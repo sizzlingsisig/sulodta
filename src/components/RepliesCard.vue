@@ -67,12 +67,32 @@ watch(mode, () => {
   sort.value = 'az'
 })
 
+const isClassmateUnavailable = (name) => {
+  const set = props.replies[name]
+  if (!set || !set.size) return false
+  for (const k of set) {
+    if (k.endsWith('|-1')) return true
+  }
+  return false
+}
+
+const unavailableCount = computed(
+  () => ROSTER.filter((name) => isClassmateUnavailable(name)).length,
+)
+
 const people = computed(() => {
   const key = props.selectedSlot
-  let list = ROSTER.map((name) => ({
-    name,
-    ok: key ? (props.replies[name]?.has(key) ?? false) : (props.replies[name]?.size ?? 0) > 0,
-  }))
+  let list = ROSTER.map((name) => {
+    const unavailable = isClassmateUnavailable(name)
+    const set = props.replies[name]
+    const hasSlot = key ? (set?.has(key) ?? false) : false
+    const hasReplied = (set?.size ?? 0) > 0
+    return {
+      name,
+      ok: key ? hasSlot : hasReplied,
+      unavailable,
+    }
+  })
 
   const needle = q.value.trim().toLowerCase()
   if (needle) list = list.filter((person) => person.name.toLowerCase().includes(needle))
@@ -124,7 +144,12 @@ async function copySummary() {
       )
       .join('\n') || '(no times painted yet)'
   const waiting = ROSTER.length - props.responded
-  const text = `AquaSci 1 — ${props.eventName || 'HKK Outreach'}\n${props.responded}/${ROSTER.length} replied\n\nTop slots:\n${topText}\n\nStill waiting on: ${waiting} classmate${waiting === 1 ? '' : 's'}\n\nAdd your times: ${location.href}`
+  const availableCount = Math.max(0, props.responded - unavailableCount.value)
+  const breakdown =
+    unavailableCount.value > 0
+      ? ` (${availableCount} available, ${unavailableCount.value} can’t attend)`
+      : ''
+  const text = `AquaSci 1 — ${props.eventName || 'HKK Outreach'}\n${props.responded}/${ROSTER.length} replied${breakdown}\n\nTop slots:\n${topText}\n\nStill waiting on: ${waiting} classmate${waiting === 1 ? '' : 's'}\n\nAdd your times: ${location.href}`
 
   try {
     if (!navigator.clipboard) throw new Error('no clipboard')
@@ -210,8 +235,15 @@ async function copySummary() {
         </p>
         <div class="bar"><i :style="{ width: `${progress}%` }" /></div>
         <ul class="chips" role="list">
-          <li v-for="person in people" :key="person.name" class="chip" :class="{ ok: person.ok }">
-            <span class="dot" />{{ person.name }}{{ person.ok ? ' ✓' : '' }}
+          <li
+            v-for="person in people"
+            :key="person.name"
+            class="chip"
+            :class="{ ok: person.ok, unavail: person.unavailable }"
+          >
+            <span class="dot" />{{ person.name }}
+            <span v-if="person.unavailable" class="tag-unavail"> (can’t attend)</span>
+            <span v-else-if="person.ok"> ✓</span>
           </li>
           <li v-if="!people.length" class="cap">
             {{ q ? `no matches for “${q}”` : 'nobody in this filter yet' }}

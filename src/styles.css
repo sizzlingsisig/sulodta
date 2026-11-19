@@ -279,7 +279,11 @@ input:focus-visible,
   position: relative;
   padding: 18px 20px;
   background: var(--surface);
+  border-radius: 10px;
   rotate: var(--rot, 0deg);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   animation: cardIn 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
   animation-delay: var(--d, 0s);
 }
@@ -623,40 +627,158 @@ select {
   border: 1.5px solid var(--teal);
   background: var(--hover);
   border-radius: 9px;
-  padding: 9px 12px;
-  margin-bottom: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
 }
 
 .slothead {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 8px;
-  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
   font: 13px var(--ui);
 }
 
-.slothead b {
-  grid-column: 1;
-  font-size: 14px;
+.slothead-title b {
+  font-size: 15px;
+  color: var(--ink);
+  display: block;
 }
 
-.slothead span {
-  grid-column: 1 / -1;
+.slothead-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stat-free {
+  color: var(--green-ink);
+  font-weight: 700;
+}
+
+.stat-busy {
+  color: var(--danger-ink);
+  font-weight: 600;
 }
 
 .slothead .pill {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
   margin-left: 0;
-  padding: 3px 9px;
+  padding: 3px 10px;
+  font-size: 12px;
+  flex: none;
 }
 
-.slotnames {
-  margin: 6px 0 0;
-  font: 12.5px/1.45 var(--ui);
+.slot-groups {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+
+.slot-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.group-label {
+  font-weight: 700;
+  width: 42px;
+  flex-shrink: 0;
+  color: var(--ink);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+
+.name-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.name-chips .chip {
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.name-chips .chip.free {
+  background: var(--cellfill);
+  border: 1px solid var(--green);
+  color: var(--green-ink);
+  font-weight: 600;
+}
+
+.name-chips .chip.busy {
+  background: rgba(220, 53, 69, 0.08);
+  border: 1px solid rgba(220, 53, 69, 0.25);
+  color: var(--danger-ink);
+}
+
+/* Day selector tabs */
+.day-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 0 10px;
+  margin-bottom: 2px;
+}
+
+.day-tab {
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font: 600 13px var(--ui);
+  cursor: pointer;
   color: var(--muted-strong);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.day-tab:hover {
+  border-color: var(--teal);
+  color: var(--ink);
+}
+
+.day-tab.active {
+  background: var(--teal-deep);
+  color: #fff;
+  border-color: var(--teal-deep);
+  box-shadow: 0 1px 3px rgba(27, 43, 39, 0.12);
+}
+
+.pill.subtle {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted-strong);
+}
+
+.pill.subtle:hover {
+  border-color: var(--danger);
+  color: var(--danger-ink);
+  background: rgba(220, 53, 69, 0.05);
+}
+
+.chip.unavail {
+  background: rgba(220, 53, 69, 0.06);
+  border-color: rgba(220, 53, 69, 0.2);
+}
+
+.tag-unavail {
+  color: var(--danger-ink);
+  font-size: 11.5px;
+  font-style: italic;
+  font-weight: normal;
 }
 
 .slotnames b {
@@ -1139,6 +1261,15 @@ select {
   visibility: hidden;
 }
 
+.day.outside {
+  color: var(--muted);
+  opacity: 0.32;
+}
+
+.day.outside.on {
+  opacity: 0.65;
+}
+
 .day.today {
   border-color: var(--teal);
 }
@@ -1462,15 +1593,15 @@ select {
     display: contents;
   }
 
-  .a-cal {
+  .a-paint {
     order: 1;
   }
 
-  .a-paint {
+  .a-replies {
     order: 2;
   }
 
-  .a-replies {
+  .a-cal {
     order: 3;
   }
 
@@ -1545,8 +1676,8 @@ select {
   }
 
   .canvas {
-    padding: 84px 14px 100px;
-    gap: 18px;
+    padding: 72px 12px 80px;
+    gap: 14px;
   }
 
   .canvas.is-setup {

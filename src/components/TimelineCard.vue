@@ -17,7 +17,7 @@ defineProps({
     </ul>
     <p v-if="!entries.length" class="lbempty">No timeline entries yet.</p>
     <p class="cap">
-      Managed by the PM in Supabase. Dated entries appear as
+      Managed by the PM. Dated entries appear as
       <b style="color: var(--danger)">●</b> on the calendar. Blank dates show as TBA.
     </p>
   </section>

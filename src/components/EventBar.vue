@@ -1,5 +1,5 @@
 <script setup>
-import { Database, Info, RefreshCw } from '@lucide/vue'
+import { CalendarDays, Info, RefreshCw } from '@lucide/vue'
 
 defineProps({
   events: { type: Array, default: () => [] },
@@ -24,7 +24,7 @@ const activeId = defineModel('activeId', { default: '' })
           stroke-linecap="round"
         />
       </svg>
-      <p class="sub">HKK outreach scheduler · first week of Dec 2026</p>
+      <p class="sub">Class outreach availability poll</p>
     </div>
     <div class="eb-controls">
       <div v-if="events.length > 1" id="evPick">
@@ -44,8 +44,8 @@ const activeId = defineModel('activeId', { default: '' })
           <button
             class="mini"
             type="button"
-            title="Reload events, days and timeline from Supabase"
-            aria-label="Reload from Supabase"
+            title="Reload event details and timeline"
+            aria-label="Reload event details"
             :disabled="loading"
             @click="$emit('refresh')"
           >
@@ -60,8 +60,8 @@ const activeId = defineModel('activeId', { default: '' })
           <button
             class="mini"
             type="button"
-            title="Reload events, days and timeline from Supabase"
-            aria-label="Reload from Supabase"
+            title="Reload event details and timeline"
+            aria-label="Reload event details"
             :disabled="loading"
             @click="$emit('refresh')"
           >
@@ -69,16 +69,15 @@ const activeId = defineModel('activeId', { default: '' })
           </button>
         </div>
       </div>
-      <span class="whochip none" title="Events and candidate days are edited in the Supabase dashboard">
-        <Database />PM edits in Supabase
+      <span class="whochip none" title="Events and candidate days are set by the PM">
+        <CalendarDays />Managed by PM
       </span>
     </div>
     <div class="guide">
       <Info />
       <span>
         <b>Each event stays separate.</b> Every event keeps its own days, grid and replies.
-        Candidate days and the timeline are <b>read-only here</b> — the PM edits them in the
-        Supabase dashboard. Pick your name, paint your free times, then open <b>Results</b>.
+        Candidate days and the timeline are <b>set by the PM</b>. Pick your name, paint your free times, then open <b>Results</b>.
         <b>Share</b> the link so classmates can add theirs.
       </span>
     </div>

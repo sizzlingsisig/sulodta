@@ -1,12 +1,62 @@
 <template>
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
-    <filter id="rough">
-      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4" result="n" />
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" />
+    <filter
+      id="rough"
+      x="-10%"
+      y="-10%"
+      width="120%"
+      height="120%"
+      color-interpolation-filters="sRGB"
+    >
+      <feTurbulence
+        x="-10%"
+        y="-10%"
+        width="120%"
+        height="120%"
+        type="fractalNoise"
+        baseFrequency="0.04"
+        numOctaves="2"
+        seed="4"
+        result="n"
+      />
+      <feDisplacementMap
+        x="-10%"
+        y="-10%"
+        width="120%"
+        height="120%"
+        in="SourceGraphic"
+        in2="n"
+        scale="1.4"
+      />
     </filter>
-    <filter id="rough2">
-      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" result="n" />
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="2" />
+    <filter
+      id="rough2"
+      x="-10%"
+      y="-10%"
+      width="120%"
+      height="120%"
+      color-interpolation-filters="sRGB"
+    >
+      <feTurbulence
+        x="-10%"
+        y="-10%"
+        width="120%"
+        height="120%"
+        type="fractalNoise"
+        baseFrequency="0.05"
+        numOctaves="2"
+        seed="7"
+        result="n"
+      />
+      <feDisplacementMap
+        x="-10%"
+        y="-10%"
+        width="120%"
+        height="120%"
+        in="SourceGraphic"
+        in2="n"
+        scale="1.2"
+      />
     </filter>
   </svg>
 </template>

@@ -74,7 +74,7 @@ onUnmounted(() => clearTimeout(wiggleTimer))
         <li><span>Replies</span><span>{{ repliesCount }} / {{ ROSTER.length }}</span></li>
         <li><span>Best slot</span><span>{{ bestLabel }}</span></li>
         <li><span>Next deadline</span><span>{{ nextLabel }}</span></li>
-        <li><span>Your blocks</span><span>{{ me ? myBlocks : 'pick a name' }}</span></li>
+        <li><span>Your times</span><span>{{ me ? `${myBlocks} selected` : 'pick a name' }}</span></li>
       </ul>
     </div>
     <p class="cap c">morale officer · {{ mood.label }}</p>
