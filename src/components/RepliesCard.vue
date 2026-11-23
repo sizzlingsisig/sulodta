@@ -122,7 +122,18 @@ const mood = computed(() => {
   return { kind: 1, cap: `${props.responded} of ${ROSTER.length} in — hopeful` }
 })
 
-const top = computed(() => props.ranked.slice(0, 5))
+const top = computed(() => {
+  // One row per day: the first (highest-ranked) slot for each day.
+  const seen = new Set()
+  const rows = []
+  for (const row of props.ranked) {
+    if (seen.has(row.day)) continue
+    seen.add(row.day)
+    rows.push(row)
+    if (rows.length === 5) break
+  }
+  return rows
+})
 
 const selectedLabel = computed(() =>
   selected.value
@@ -136,12 +147,9 @@ function pick(row) {
 
 async function copySummary() {
   const topText =
-    props.ranked
+    top.value
       .slice(0, 3)
-      .map(
-        (x, i) =>
-          `${i + 1}. ${fmt(x.day).dow} ${fmt(x.day).md}, ${slotLabel(x.slot)} — ${x.count} free`,
-      )
+      .map((x, i) => `${i + 1}. ${fmt(x.day).long} — ${x.count} free`)
       .join('\n') || '(no times painted yet)'
   const waiting = ROSTER.length - props.responded
   const availableCount = Math.max(0, props.responded - unavailableCount.value)
@@ -193,7 +201,7 @@ async function copySummary() {
       </div>
     </div>
     <div class="lb">
-      <h3>Top slots so far</h3>
+      <h3>Top days so far</h3>
       <button
         v-for="(row, index) in top"
         :key="`${row.day}|${row.slot}`"
@@ -202,7 +210,7 @@ async function copySummary() {
         @click="pick(row)"
       >
         <span class="rk">{{ index + 1 }}</span>
-        <span>{{ fmt(row.day).dow }} {{ fmt(row.day).md }} · {{ slotLabel(row.slot) }}</span>
+        <span>{{ fmt(row.day).long }}</span>
         <span class="lbb">
           <i :style="{ width: `${responded ? Math.round((row.count / responded) * 100) : 0}%` }" />
         </span>

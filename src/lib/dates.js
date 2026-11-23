@@ -25,7 +25,11 @@ export const slotLabel = (h) => {
 
 export const fmt = (s) => {
   const d = parse(s)
-  return { dow: DOW[d.getDay()], md: `${SHORT[d.getMonth()]} ${d.getDate()}` }
+  return {
+    dow: DOW[d.getDay()],
+    md: `${SHORT[d.getMonth()]} ${d.getDate()}`,
+    long: `${MNAMES[d.getMonth()]} ${d.getDate()}`,
+  }
 }
 
 export const todayISO = () => {
